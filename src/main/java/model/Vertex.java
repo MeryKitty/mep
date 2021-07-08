@@ -4,14 +4,14 @@ import java.util.Arrays;
 
 public class Vertex {
 	private final short row, column;
-	private float distance = Float.POSITIVE_INFINITY;
+	private float distance;
 	private Vertex previous;
 	private int[] cellContains;
 	private int branch;
-	public int indexInQueue = -1;
+	public int indexInQueue;
 	private boolean addedToVector;
 	
-	@__inline__
+	@__primitive__
 	public class CellIterator {
 		private int cursor;
 		private int length;

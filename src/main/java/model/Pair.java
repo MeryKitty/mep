@@ -2,7 +2,7 @@ package model;
 
 import java.util.Objects;
 
-@__inline__
+@__primitive__
 public class Pair<T, U> {
 	private final T first;
 	private final U second;

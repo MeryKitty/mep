@@ -2,9 +2,9 @@ package algorithm;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 
 import jdk.incubator.vector.VectorSpecies;
-import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.FloatVector;
 
@@ -14,16 +14,9 @@ import model.Pair;
 import model.Vertex;
 
 public class Dijkstra {
-	private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_PREFERRED;
 	private static final VectorSpecies<Float> FLOAT_SPECIES = FloatVector.SPECIES_PREFERRED;
 	private static final int LANE_NUMBER = FLOAT_SPECIES.length();
-	private static final MinHeap QUEUE = new MinHeap(200000);
 	private static final float SCALE = Config.DELTA / Config.M;
-	private static final FloatVector ONE_V = FloatVector.broadcast(FLOAT_SPECIES, 1F);
-	private static final FloatVector ZERO_V = FloatVector.broadcast(FLOAT_SPECIES, 1e-5F);
-	private static final IntVector M_V = IntVector.broadcast(INT_SPECIES, Config.M - 1);
-
-	private static long[] clock = new long[10];
 
 	private static final class MinHeap {
 		Vertex[] elementData;
@@ -35,10 +28,6 @@ public class Dijkstra {
 		
 		boolean isEmpty() {
 			return this.size == 0;
-		}
-		
-		void clear() {
-			this.size = 0;
 		}
 		
 		Vertex get(int index) {
@@ -164,21 +153,21 @@ public class Dijkstra {
 	}
 	
 	public static Pair<List<Vertex>, Float> execute(Graph graph) {
-		QUEUE.clear();
+		var queue = new MinHeap(400_000);
 		var cellCon = graph.cellContainer();
 		var source = graph.source();
 		var sink = graph.sink();
-		QUEUE.addVertex(graph.source());
+		queue.addVertex(graph.source());
 		float result = Float.POSITIVE_INFINITY;
 	
 		int maxSize = FLOAT_SPECIES.loopBound(Config.M * 12 - 4) + LANE_NUMBER;
 		Vertex[] Bs = new Vertex[maxSize];
 		float[] tempDistances = new float[maxSize];
-		int[] BRows = new int[maxSize];
-		int[] BColumns = new int[maxSize];
+		float[] BRows = new float[maxSize];
+		float[] BColumns = new float[maxSize];
 		
 		while (true) {
-			var current = QUEUE.pollFirst();
+			var current = queue.pollFirst();
 			if (current == null) {
 				break;
 			} else if (current == sink) {
@@ -190,9 +179,9 @@ public class Dijkstra {
 			graph.vertexSet().addLeaf(current);
 			
 			if (current != source) {
-				traverse(cellCon, current, Bs, BRows, BColumns, tempDistances);
+				traverse(queue, cellCon, current, Bs, BRows, BColumns, tempDistances);
 			} else {
-				sourceTraverse(graph);
+				sourceTraverse(graph, queue);
 			}
 		}
 		if (result == Float.POSITIVE_INFINITY) {
@@ -201,27 +190,14 @@ public class Dijkstra {
 		var resultPath = new LinkedList<Vertex>();
 		
 		Vertex current = graph.sink();
-		while (true) {
+		while (current != null) {
 			resultPath.addFirst(current);
 			current = current.previous();
-			if (current == null) {
-				break;
-			}
 		}
 		return new Pair<>(resultPath, result);
 	}
 
-	public static void restartClock() {
-		for (int i = 0; i < clock.length; i++) {
-			clock[i] = 0;
-		}
-	}
-
-	public static long clock(int i) {
-		return clock[i];
-	}
-	
-	private static void sourceTraverse(Graph graph) {
+	private static void sourceTraverse(Graph graph, MinHeap queue) {
 		var current = graph.source();
 		var cellCon = graph.cellContainer();
 		for (var cellIter = current.cellIter(); cellIter.valid(); cellIter = cellIter.next()) {
@@ -229,116 +205,74 @@ public class Dijkstra {
 				var vertex = vertexIter.get();
 				vertex.setDistance(0);
 				vertex.setPrevious(current);
-				QUEUE.addVertex(vertex);
+				queue.addVertex(vertex);
 			}
 		}
 	}
 	
-	private static void traverse(CellContainer cellCon, Vertex current, Vertex[] Bs, int[] BRows, int[] BColumns, float[] tempDistances) {
+	private static void traverse(MinHeap queue, CellContainer cellCon, Vertex current, Vertex[] Bs, float[] BRows, float[] BColumns, float[] tempDistances) {
 		int size = 0;
 		float averExpo = 0;
-		long start = System.currentTimeMillis();
 		for (var cellIter = current.cellIter(); cellIter.valid(); cellIter = cellIter.next()) {
 			int cellIndex = cellIter.get();
 			averExpo += cellCon.exposure(cellIndex);
 			for (var vertexIter = cellCon.vertexIter(cellIndex); vertexIter.valid(); vertexIter = vertexIter.next()) {
 				var v = vertexIter.get();
 				if (v.indexInQueue > -2 && !v.addedToVector()) {
-					v.addToVector();
-					Bs[size] = v;
-					BRows[size] = v.row();
-					BColumns[size++] = v.column();
+					if (v.row() < 0) {
+						v.setDistance(current.distance());
+						v.setPrevious(current);
+						queue.addVertex(v);
+					} else {
+						v.addToVector();
+						Bs[size] = v;
+						BRows[size] = v.row();
+						BColumns[size] = v.column();
+						size++;
+					}
 				}
 			}
 		}
 		averExpo /= current.cellNumber();
-		averExpo *= SCALE;
-		long mid1 = System.currentTimeMillis();
 		
 		bulkOperations(current, averExpo, BRows, BColumns, tempDistances, size);
 
-		long mid2 = System.currentTimeMillis();
 		for (int i = 0; i < size; i++) {
 			Vertex v = Bs[i];
 			v.resetAddToVector();
 			float tempTotalExposure = tempDistances[i];
+//			System.out.println(tempTotalExposure);
 			if (v.distance() > tempTotalExposure) {
 				v.setPrevious(current);
 				if (v.distance() == Float.POSITIVE_INFINITY) {
 					v.setDistance(tempTotalExposure);
-					QUEUE.addVertex(v);
+					queue.addVertex(v);
 				} else {
-					QUEUE.decreaseKey(v, tempTotalExposure);
+					queue.decreaseKey(v, tempTotalExposure);
 				}
 			}
 		}
-		long end = System.currentTimeMillis();
-		clock[0] += (mid1 - start);
-		clock[1] += (mid2 - mid1);
-		clock[2] += (end - mid2);
 	}
 	
-	private static void bulkOperations(Vertex current, float averExpo, int[] BRows, int[] BColumns, float[] tempDistances, int size) {
+	private static void bulkOperations(Vertex current, float averExpo, float[] BRows, float[] BColumns, float[] tempDistances, int size) {
 		int ARow = current.row(), AColumn = current.column();
 		var currentDistanceV = FloatVector.broadcast(FLOAT_SPECIES, current.distance());
-		var ARowV = IntVector.broadcast(INT_SPECIES, ARow);
-		var AColumnV = IntVector.broadcast(INT_SPECIES, AColumn);
-		var averExpoV = FloatVector.broadcast(FLOAT_SPECIES, averExpo);
+		var ARowV = FloatVector.broadcast(FLOAT_SPECIES, ARow);
+		var AColumnV = FloatVector.broadcast(FLOAT_SPECIES, AColumn);
+		var averExpoScaledV = FloatVector.broadcast(FLOAT_SPECIES, averExpo * SCALE);
 
 		int loopBound = FLOAT_SPECIES.loopBound(size - 1) + LANE_NUMBER;
-		if (ARow % Config.M != 0) {
-			for (int i = 0; i < loopBound; i += LANE_NUMBER) {
-				var BRowV = IntVector.fromArray(INT_SPECIES, BRows, i);
-				var BColumnV = IntVector.fromArray(INT_SPECIES, BColumns, i);
-				var rowDiffV = ARowV.sub(BRowV);
-				var columnDiffV = AColumnV.sub(BColumnV);
-				var distanceV = currentDistanceV.add(
-					averExpoV.mul(
-						rowDiffV.mul(rowDiffV).add(columnDiffV.mul(columnDiffV)).castShape(FLOAT_SPECIES, 0).lanewise(VectorOperators.SQRT)
-					).div(
-						ZERO_V.blend(
-							ONE_V,
-							AColumnV.eq(BColumnV).not().or(
-								BRowV.and(M_V).eq(0)
-							).cast(FLOAT_SPECIES)
-						)
+		for (int i = 0; i < loopBound; i += LANE_NUMBER) {
+			var BRowV = FloatVector.fromArray(FLOAT_SPECIES, BRows, i);
+			var BColumnV = FloatVector.fromArray(FLOAT_SPECIES, BColumns, i);
+			var rowDiffV = ARowV.sub(BRowV);
+			var columnDiffV = AColumnV.sub(BColumnV);
+			var distanceV = currentDistanceV.add(
+					averExpoScaledV.mul(
+							rowDiffV.mul(rowDiffV).add(columnDiffV.mul(columnDiffV)).lanewise(VectorOperators.SQRT)
 					)
-				);
-				distanceV.intoArray(tempDistances, i);
-			}
-		} else if (AColumn % Config.M != 0) {
-			for (int i = 0; i < loopBound; i += LANE_NUMBER) {
-				var BRowV = IntVector.fromArray(INT_SPECIES, BRows, i);
-				var BColumnV = IntVector.fromArray(INT_SPECIES, BColumns, i);
-				var rowDiffV = ARowV.sub(BRowV);
-				var columnDiffV = AColumnV.sub(BColumnV);
-				var distanceV = currentDistanceV.add(
-					averExpoV.mul(
-						rowDiffV.mul(rowDiffV).add(columnDiffV.mul(columnDiffV)).castShape(FLOAT_SPECIES, 0).lanewise(VectorOperators.SQRT)
-					).div(
-						ZERO_V.blend(
-							ONE_V,
-							ARowV.eq(BRowV).not().or(
-								BColumnV.and(M_V).eq(0)
-							).cast(FLOAT_SPECIES)
-						)
-					)
-				);
-				distanceV.intoArray(tempDistances, i);
-			}
-		} else {
-			for (int i = 0; i < loopBound; i += LANE_NUMBER) {
-				var BRowV = IntVector.fromArray(INT_SPECIES, BRows, i);
-				var BColumnV = IntVector.fromArray(INT_SPECIES, BColumns, i);
-				var rowDiffV = ARowV.sub(BRowV);
-				var columnDiffV = AColumnV.sub(BColumnV);
-				var distanceV = currentDistanceV.add(
-					averExpoV.mul(
-						rowDiffV.mul(rowDiffV).add(columnDiffV.mul(columnDiffV)).castShape(FLOAT_SPECIES, 0).lanewise(VectorOperators.SQRT)
-					)
-				);
-				distanceV.intoArray(tempDistances, i);
-			}
+			);
+			distanceV.intoArray(tempDistances, i);
 		}
 	}
 }

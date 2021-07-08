@@ -2,6 +2,7 @@ package p2;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,9 +12,9 @@ public class Field implements IField{
 	private int W, H;
 	private List<Sensor> sensorList;
 	
-	public Field(String filename) throws Exception {
-        this.sensorList = new ArrayList<Sensor>();
-        BufferedReader input = new BufferedReader(new FileReader(filename));
+	public Field(Path filename) throws Exception {
+        this.sensorList = new ArrayList<>();
+        BufferedReader input = new BufferedReader(new FileReader(filename.toString()));
 		String s = input.readLine();
 		String[] s1 = s.split(" ");
 		this.W = Integer.parseInt(s1[0]);
@@ -49,17 +50,13 @@ public class Field implements IField{
 	public double exposure(double x, double y) {
 		double value = 0;
         for (int i = 0; i < this.sensorList.size(); i++)
-        	value = value + Sensor_Point(this.sensorList.get(i), x, y);
-        if (value < 1E-9) {
-        	return 0.0001;
-        } else {
-            return value;
-        }
+        	value += Sensor_Point(this.sensorList.get(i), x, y);
+        return Math.max(value, 1e-4);
 	}
 
 	@Override
 	public boolean isSource(double x, double y, double error) {
-		if (Math.abs(x - 0) < error) {
+		if (Math.abs(x - 0) < error && y > 100 && y < this.H - 100) { // && Math.abs(y - 150) < error) {
 			return true;
 		} else {
 			return false;
@@ -68,7 +65,7 @@ public class Field implements IField{
 
 	@Override
 	public boolean isSink(double x, double y, double error) {
-		if (Math.abs(x - this.W) < error) {
+		if (Math.abs(x - this.W) < error && y > 100 && y < this.H - 100) { // && Math.abs(y - 350) < error) {
 			return true;
 		} else {
 			return false;
@@ -76,10 +73,16 @@ public class Field implements IField{
 	}
 	
 	private static double Sensor_Point(Sensor s, double x, double y) {
-        double dx = x - s.p.x;
-        double dy = y - s.p.y;
-        double tvh = dx * Math.cos(s.Viangle) + dy * Math.sin(s.Viangle);
-        double d = Math.sqrt(dx * dx + dy * dy);
-        return ((d > s.r) || (tvh < d * Math.cos(s.angle))) ? 0 : 1;
+		double dx = x - s.p.x;
+		double dy = y - s.p.y;
+		double d = Math.sqrt(dx * dx + dy * dy);
+		double cos2 = (dx * Math.cos(s.Viangle) + dy * Math.sin(s.Viangle)) / d;
+		double cos = Math.sqrt((cos2 + 1) / 2);
+		return Math.min(cos / d, 0.5);
+//        double dx = x - s.p.x;
+//        double dy = y - s.p.y;
+//        double tvh = dx * Math.cos(s.Viangle) + dy * Math.sin(s.Viangle);
+//        double d = Math.sqrt(dx * dx + dy * dy);
+//        return ((d > s.r) || (tvh < d * Math.cos(s.angle))) ? 0 : 1;
     }
 }

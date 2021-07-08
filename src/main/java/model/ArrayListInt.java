@@ -25,10 +25,7 @@ package model;
  * questions.
  */
 
-import java.util.Arrays;
-import java.util.ConcurrentModificationException;
-import java.util.NoSuchElementException;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.IntConsumer;
 
 /**
@@ -39,9 +36,6 @@ public class ArrayListInt
 //        extends AbstractList<E>
 //        implements List<int>, RandomAccess, Cloneable, java.io.Serializable
 {
-    @java.io.Serial
-    private static final long serialVersionUID = 8683452581122892189L;
-
     /**
      * Default initial capacity.
      */
@@ -250,7 +244,7 @@ public class ArrayListInt
     // Positional Access Operations
 
     int elementData(int index) {
-        return (int) elementData[index];
+        return elementData[index];
     }
 
     static int elementAt(int[] es, int index) {
@@ -345,7 +339,7 @@ public class ArrayListInt
         Objects.checkIndex(index, size);
         final int[] es = elementData;
 
-        int oldValue = (int) es[index];
+        int oldValue = es[index];
         fastRemove(es, index);
 
         return oldValue;

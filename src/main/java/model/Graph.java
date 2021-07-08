@@ -6,7 +6,7 @@ public final class Graph {
 	private int sourceAdjacent, sinkAdjacent;
 
 	private final VertexContainer vertexSet;
-	private CellContainer cellContainer;
+	private final CellContainer cellContainer;
 	
 	@SuppressWarnings("unused")
 	private static class CellRowConstruct implements Runnable {
@@ -147,7 +147,7 @@ public final class Graph {
 					var temp = field.exposure(x, y);
 					tempRow[j] = (float)temp;
 				} else {
-					tempRow[j] = -1;
+					tempRow[j] = Float.POSITIVE_INFINITY;
 				}
 			}
 		}

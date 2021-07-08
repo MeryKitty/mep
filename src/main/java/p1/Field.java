@@ -7,7 +7,7 @@ import model.IField;
 import model.Pair;
 
 public class Field implements IField {
-	List<Pair<Double, Double>> sensorList;
+	List<Pair.ref<Double, Double>> sensorList;
 	
 	public Field(int sensorNumber) {
 		this.sensorList = new ArrayList<>();

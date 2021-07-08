@@ -4,7 +4,7 @@ import java.util.LinkedList;
 
 import algorithm.Config;
 
-@__inline__
+@__primitive__
 public final class VertexContainer {
 	private final int majorRowNumber, majorColumnNumber;
 	private final Vertex[] data;
@@ -16,7 +16,7 @@ public final class VertexContainer {
 		this.cellContainer = cellCon;
 		this.majorRowNumber = majorRowNumber;
 		this.majorColumnNumber = majorColumnNumber;
-		this.data = new Vertex[staticGetIndex(majorRowNumber * Config.M, majorColumnNumber * Config.M, majorRowNumber, majorColumnNumber, Config.M) + 3];
+		this.data = new Vertex[staticGetIndex(majorRowNumber * Config.M, majorColumnNumber * Config.M, majorRowNumber, majorColumnNumber) + 3];
 		this.leaves = new LinkedList<>();
 	}
 	
@@ -131,7 +131,7 @@ public final class VertexContainer {
 		System.gc();
 	}
 	
-	private final void freeVertex(Vertex v) {
+	private void freeVertex(Vertex v) {
 		int index = this.getIndex(v.row(), v.column());
 		this.data[index] = null;
 		v.previous().removeBranch();
@@ -140,7 +140,7 @@ public final class VertexContainer {
 		}
 	}
 	
-	private final boolean dead(Vertex v) {
+	private boolean dead(Vertex v) {
 		if (v.indexInQueue != - 2 || !v.dead()) {
 			return false;
 		}
@@ -161,14 +161,15 @@ public final class VertexContainer {
 				&& row <= this.majorRowNumber * Config.M
 				&& column <= this.majorColumnNumber * Config.M
 				&& (row % Config.M == 0 || column % Config.M == 0));
-		return staticGetIndex(row, column, this.majorRowNumber, this.majorColumnNumber, Config.M);
+		return staticGetIndex(row, column, this.majorRowNumber, this.majorColumnNumber);
 	}
 
 	Vertex[] data() {
 		return this.data;
 	}
 
-	private final static int staticGetIndex(int row, int column, int majorRowNumber, int majorColumnNumber, int m) {
+	private static int staticGetIndex(int row, int column, int majorRowNumber, int majorColumnNumber) {
+		int m = Config.M;
 		int majorRow = row / m;
 		int leftRow = row - m * majorRow;
 		int result = majorRow * (majorColumnNumber * m + 1 + (m - 1) * (majorColumnNumber + 1));

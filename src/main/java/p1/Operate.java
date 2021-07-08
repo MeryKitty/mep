@@ -2,6 +2,7 @@ package p1;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
@@ -55,7 +56,7 @@ public class Operate {
 			for (int j = 0; j < time.length; j++) {
 				long start = System.currentTimeMillis();
 				var graph = Graph.construct(field);
-				Pair<List<Vertex>, Float> result = null;
+				Pair<List<Vertex>, Float> result = Pair.default;
 //				if (j == 0) {
 				
 				result = Dijkstra.execute(graph);
@@ -68,7 +69,7 @@ public class Operate {
 				System.out.println();
 				long end = System.currentTimeMillis();
 				Files.createDirectories(Paths.get("data/p1"));
-				DrawUtils.draw("data/p1/data_" + i + ".png", result.second(), result.first(), field, graph, 10);
+				DrawUtils.draw(Path.of("data/p1/data_" + i + ".png"), result.second(), result.first(), field, 10);
 				if (result.second() > 0) {
 					System.out.println(String.format("%-3d: ", i) + result.second());
 					System.out.println("   : " + (end - start));

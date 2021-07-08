@@ -11,7 +11,7 @@ public final class CellContainer {
 	private int[] vertexSetSize;
 	private VertexContainer vertexContainer;
 	
-	@__inline__
+	@__primitive__
 	public class VertexIterator {
 		private int vertexSetSize;
 		private int[] vertexIndices;
